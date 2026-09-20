@@ -1,0 +1,15 @@
+services:
+  backend:
+    build: .
+    container_name: demo-backend
+    ports:  "8080"
+    depends_on: mysql
+
+  mysql:
+    image: mysql:8.0
+    container_name: demo-sql
+    environment:
+      MYSQL_ROOT_PASSWORD: ""
+      MYSQL_DATABASE: demo
+  volumes:
+  mysql-data:

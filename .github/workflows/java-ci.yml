@@ -25,5 +25,5 @@ jobs:
       - name: Kiem tra Java
         run: java -version
 
-      - name: Chay test
-        run: mvn -B -f test_git/pom.xml test
+      - name: Build va Test
+        run: ./mvnw -B test

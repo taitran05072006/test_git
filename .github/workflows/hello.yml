@@ -1,22 +1,23 @@
-name: taitrangia
+name: My First Workflow
 
 on:
   push:
     branches:
-      -main
+      - main
 
 jobs:
-  build:
+  hello:
     runs-on: ubuntu-latest
+
     steps:
       - name: Lay source code
         uses: actions/checkout@v6
 
       - name: In thong bao
-        run: echo "Hello, World!"
+        run: echo "Hello GitHub Actions"
 
-      - name: Kiem tra java version
+      - name: Kiem tra Java
         run: java -version
 
-      - name: Xem thu muc hien tai
+      - name: Xem thu muc
         run: ls -la

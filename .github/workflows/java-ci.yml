@@ -12,16 +12,13 @@ jobs:
     services:
       mysql:
         image: mysql:8.4
-
         env:
-          MYSQL_DATABASE: product_db
+          MYSQL_DATABASE: productdb
           MYSQL_USER: ci_user
           MYSQL_PASSWORD: ci_password
           MYSQL_ROOT_PASSWORD: root_password
-
         ports:
           - 3306:3306
-
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot_password"
           --health-interval=10s
@@ -31,7 +28,7 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DB_NAME: product_db
+      DB_NAME: productdb
       DB_USER: ci_user
       DB_PASSWORD: ci_password
 

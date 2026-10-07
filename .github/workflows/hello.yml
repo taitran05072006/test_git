@@ -9,14 +9,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      -name: Lay source code
+      - name: Lay source code
         uses: actions/checkout@v6
 
-      -name: In thong bao
+      - name: In thong bao
         run: echo "Hello, World!"
 
-      -name: Kiem tra java version
+      - name: Kiem tra java version
         run: java -version
 
-      -name: Xem thu muc hien tai
+      - name: Xem thu muc hien tai
         run: ls -la

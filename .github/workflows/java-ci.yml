@@ -26,4 +26,4 @@ jobs:
         run: java -version
 
       - name: Chay test
-        run: mvn -B -f backend/pom.xml test
+        run: mvn -B -f product-api/pom.xml test

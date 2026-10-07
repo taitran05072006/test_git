@@ -1,0 +1,17 @@
+name: Test Self Hosted Runner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: self-hosted
+
+    steps:
+      - name: Kiem tra runner
+        run: |
+          echo "Runner dang chay tren may:"
+          hostname
+          whoami
+          uname -m
+          docker --version

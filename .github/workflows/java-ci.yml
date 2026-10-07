@@ -46,7 +46,7 @@ jobs:
         run: chmod +x mvnw
 
       - name: Build va Test
-        run: ./mvnw -B clean package
+        run: ./mvnw -B test
 
       - name: Dang nhap Docker Hub
         uses: docker/login-action@v4

@@ -9,6 +9,32 @@ jobs:
   build-test-push:
     runs-on: ubuntu-latest
 
+    services:
+      mysql:
+        image: mysql:8.4
+
+        env:
+          MYSQL_DATABASE: product_db
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci_password
+          MYSQL_ROOT_PASSWORD: root_password
+
+        ports:
+          - 3306:3306
+
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      DB_HOST: 127.0.0.1
+      DB_PORT: 3306
+      DB_NAME: product_db
+      DB_USER: ci_user
+      DB_PASSWORD: ci_password
+
     steps:
       - name: Lay source code
         uses: actions/checkout@v6

@@ -11,7 +11,7 @@ jobs:
 
     services:
       mysql:
-        image: mysql:8.4
+        image: mysql:8.0
         env:
           MYSQL_DATABASE: productdb
           MYSQL_USER: ci_user

@@ -7,7 +7,7 @@ public class ProductController {
 
     @GetMapping("/api/hello")
     public String hello() {
-        return "Hello from Spring Boot + Docker!";
+        return "Hello from taitran + Docker!";
     }
-    
+
 }

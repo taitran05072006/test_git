@@ -31,3 +31,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+front/node_modules/
+front/dist/
+
+product-api/target/
+
+.DS_Store
+.env

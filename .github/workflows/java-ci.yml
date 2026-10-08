@@ -12,13 +12,16 @@ jobs:
     services:
       mysql:
         image: mysql:8.0
+
         env:
           MYSQL_DATABASE: productdb
           MYSQL_USER: ci_user
           MYSQL_PASSWORD: ci_password
           MYSQL_ROOT_PASSWORD: root_password
+
         ports:
           - 3306:3306
+
         options: >-
           --health-cmd="mysqladmin ping -h 127.0.0.1 -u root -proot_password"
           --health-interval=10s
@@ -33,114 +36,175 @@ jobs:
       DB_PASSWORD: ci_password
 
     steps:
+      # =========================
+      # CHECKOUT
+      # =========================
       - name: Lay source code
         uses: actions/checkout@v6
 
+      # =========================
+      # JAVA
+      # =========================
       - name: Cai Java 21
         uses: actions/setup-java@v6
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: "21"
 
+      # =========================
+      # TEST BACKEND
+      # =========================
       - name: Build va Test Backend
-        working-directory: ./backend
-        run: mvn -B test
+        working-directory: ./product-api
+        run: ./mvnw -B test
 
+      # =========================
+      # DOCKER HUB LOGIN
+      # =========================
       - name: Dang nhap Docker Hub
         uses: docker/login-action@v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # =========================
+      # BUILDX
+      # =========================
       - name: Setup Docker Buildx
         uses: docker/setup-buildx-action@v4
 
-      - name: Build and Push Multi-Arch Image
+      # =========================
+      # BUILD BACKEND
+      # =========================
+      - name: Build and Push Backend
         uses: docker/build-push-action@v7
         with:
-          context: .
+          context: ./product-api
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
-              ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
-              ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
 
+      # =========================
+      # BUILD FRONTEND
+      # =========================
+      - name: Build and Push Frontend
+        uses: docker/build-push-action@v7
+        with:
+          context: ./front
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
+
+  # =========================================
+  # DEPLOY
+  # =========================================
   deploy:
     needs: build-test-push
     runs-on: ubuntu-latest
 
     steps:
-    - name: Connect Tailscale
-      uses: tailscale/github-action@v4
-      with:
-        oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-        oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-        tags: tag:ci
-        ping: ${{ secrets.SERVER_HOST }}
-        log-mode: normal
+      # =========================
+      # TAILSCALE
+      # =========================
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.SERVER_HOST }}
+          log-mode: normal
 
-    - name: Deploy backend
-      uses: appleboy/ssh-action@v1
-      with:
-        host: ${{ secrets.SERVER_HOST }}
-        username: ${{ secrets.SERVER_USER }}
-        key: ${{ secrets.SERVER_SSH_KEY }}
+      # =========================
+      # DEPLOY UBUNTU
+      # =========================
+      - name: Deploy Application
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
 
-        script: |
-          cd /home/deploy/java-deploy
+          script: |
+            set -e
 
-          NEW_TAG="${{ github.sha }}"
-          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/java-backend"
+            cd /home/deploy/java-deploy
 
-          echo "New version: $NEW_TAG"
+            NEW_TAG="${{ github.sha }}"
 
-          # Lấy image backend đang chạy và giữ lại làm bản rollback
-          CURRENT_IMAGE_ID=$(docker inspect demo-backend \
-          --format='{{.Image}}' 2>/dev/null || true)
+            echo "================================"
+            echo "Deploy version: $NEW_TAG"
+            echo "================================"
 
-          echo "Current image ID: $CURRENT_IMAGE_ID"
+            # Pull đúng backend + frontend của commit hiện tại
+            IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend
 
-          if [ -n "$CURRENT_IMAGE_ID" ]; then
-          docker tag "$CURRENT_IMAGE_ID" "$IMAGE_NAME:rollback"
-          echo "Saved current version as rollback"
-          fi
+            # Deploy backend + frontend mới
+            IMAGE_TAG="$NEW_TAG" docker compose up -d \
+              --no-deps \
+              --force-recreate \
+              backend frontend
 
-          # Pull đúng image của commit hiện tại
-          IMAGE_TAG="$NEW_TAG" docker compose pull backend
+            # Recreate nginx
+            IMAGE_TAG="$NEW_TAG" docker compose up -d \
+              --force-recreate nginx
 
-          # Deploy backend mới
-          IMAGE_TAG="$NEW_TAG" docker compose up -d \
-          --no-deps --force-recreate backend
+            echo "================================"
+            echo "Container status"
+            echo "================================"
 
-          # Kiểm tra tối đa khoảng 60 giây
-          for i in {1..12}; do
-          if curl --fail http://127.0.0.1:8085/api/hello; then
-          echo "Deploy successful: $NEW_TAG"
-          exit 0
-          fi
+            docker compose ps
 
-          echo "Waiting for backend... attempt $i/12"
-          sleep 5
-          done
+            echo "================================"
+            echo "Waiting for application"
+            echo "================================"
 
-          echo "New version failed"
-          docker logs demo-backend --tail 100
+            for i in {1..12}; do
 
-          # Rollback
-          if docker image inspect "$IMAGE_NAME:rollback" >/dev/null 2>&1; then
-          echo "Rolling back..."
+              if curl \
+                --fail \
+                --silent \
+                --show-error \
+                http://127.0.0.1:8085/api/hello; then
 
-          IMAGE_TAG=rollback docker compose up -d \
-          --no-deps --force-recreate backend
+                echo ""
+                echo "================================"
+                echo "Deploy successful"
+                echo "Version: $NEW_TAG"
+                echo "================================"
 
-          echo "Waiting for rollback... "
-          sleep 10
+                docker compose ps
 
-          if curl --fail http://127.0.0.1:8085/api/hello; then
-          echo "Rollback successful"
-          else
-          echo "Rollback also failed"
-          fi
-          fi
+                exit 0
+              fi
 
-          exit 1
+              echo "Application not ready - attempt $i/12"
+
+              sleep 5
+            done
+
+            echo "================================"
+            echo "Deploy failed"
+            echo "================================"
+
+            echo ""
+            echo "----- BACKEND LOG -----"
+            docker compose logs backend --tail 100 || true
+
+            echo ""
+            echo "----- FRONTEND LOG -----"
+            docker compose logs frontend --tail 100 || true
+
+            echo ""
+            echo "----- NGINX LOG -----"
+            docker compose logs nginx --tail 100 || true
+
+            echo ""
+            echo "----- MYSQL LOG -----"
+            docker compose logs mysql --tail 100 || true
+
+            exit 1

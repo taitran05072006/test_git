@@ -92,8 +92,19 @@ jobs:
           docker compose pull backend
           docker compose up -d --no-deps backend
 
-          sleep 15
-
           docker compose ps
 
-          curl --fail http://127.0.0.1:8085/api/hello
+          for i in {1..12}; do
+            if curl --fail http://127.0.0.1:8085/api/hello; then
+              echo "Backend is ready"
+              exit 0
+            fi
+
+            echo "Waiting for backend..."
+            sleep 5
+          done
+
+          echo "Backend failed to become ready"
+          echo "Docker logs:"
+          docker logs demo-backend --tail 100
+          exit 1

@@ -64,6 +64,7 @@ jobs:
           push: true
           platforms: linux/amd64,linux/arm64
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
+                ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
 
   deploy:
     needs: build-test-push
@@ -89,22 +90,58 @@ jobs:
         script: |
           cd /home/deploy/java-deploy
 
-          docker compose pull backend
-          docker compose up -d --no-deps backend
+          NEW_TAG="${{ github.sha }}"
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/java-backend"
 
-          docker compose ps
+          echo "New version: $NEW_TAG"
 
+          # Lấy image backend đang chạy và giữ lại làm bản rollback
+          CURRENT_IMAGE_ID=$(docker inspect demo-backend \
+          --format='{{.Image}}' 2>/dev/null || true)
+
+          echo "Current image ID: $CURRENT_IMAGE_ID"
+
+          if [ -n "$CURRENT_IMAGE_ID" ]; then
+          docker tag "$CURRENT_IMAGE_ID" "$IMAGE_NAME:rollback"
+          echo "Saved current version as rollback"
+          fi
+
+          # Pull đúng image của commit hiện tại
+          IMAGE_TAG="$NEW_TAG" docker compose pull backend
+
+          # Deploy backend mới
+          IMAGE_TAG="$NEW_TAG" docker compose up -d \
+          --no-deps --force-recreate backend
+
+          # Kiểm tra tối đa khoảng 60 giây
           for i in {1..12}; do
-            if curl --fail http://127.0.0.1:8085/api/hello; then
-              echo "Backend is ready"
-              exit 0
-            fi
+          if curl --fail http://127.0.0.1:8085/api/hello; then
+          echo "Deploy successful: $NEW_TAG"
+          exit 0
+          fi
 
-            echo "Waiting for backend..."
-            sleep 5
+          echo "Waiting for backend... attempt $i/12"
+          sleep 5
           done
 
-          echo "Backend failed to become ready"
-          echo "Docker logs:"
+          echo "New version failed"
           docker logs demo-backend --tail 100
+
+          # Rollback
+          if docker image inspect "$IMAGE_NAME:rollback" >/dev/null 2>&1; then
+          echo "Rolling back..."
+
+          IMAGE_TAG=rollback docker compose up -d \
+          --no-deps --force-recreate backend
+
+          echo "Waiting for rollback... "
+          sleep 10
+
+          if curl --fail http://127.0.0.1:8085/api/hello; then
+          echo "Rollback successful"
+          else
+          echo "Rollback also failed"
+          fi
+          fi
+
           exit 1

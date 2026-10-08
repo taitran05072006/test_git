@@ -65,7 +65,6 @@ jobs:
           docker push \
             ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
 
-
   deploy:
     needs: build-test-push
     runs-on: ubuntu-latest
@@ -79,23 +78,21 @@ jobs:
         tags: tag:ci
         ping: ${{ secrets.SERVER_HOST }}
 
-    - name: Deploy to backend
+    - name: Deploy backend
       uses: appleboy/ssh-action@v1
       with:
         host: ${{ secrets.SERVER_HOST }}
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
-        passphrase: ${{ secrets.SERVER_SSH_PASSPHRASE }}
 
         script: |
           cd /home/deploy/java-deploy
 
           docker compose pull backend
-
           docker compose up -d --no-deps backend
 
           sleep 15
 
           docker compose ps
 
-          curl --fail http://127.0.0.1:8085/health
+          curl --fail http://127.0.0.1:8085/api/hello

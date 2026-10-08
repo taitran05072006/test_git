@@ -42,7 +42,8 @@ jobs:
           distribution: temurin
           java-version: '21'
 
-      - name: Build va Test
+      - name: Build va Test Backend
+        working-directory: ./backend
         run: mvn -B test
 
       - name: Dang nhap Docker Hub

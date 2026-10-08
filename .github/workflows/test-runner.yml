@@ -11,7 +11,9 @@ jobs:
       - name: Kiem tra runner
         run: |
           echo "Runner dang chay tren may:"
-          hostname
+          hostname -I
           whoami
           uname -m
           docker --version
+          echo "Docker Compose version:"
+          docker compose version

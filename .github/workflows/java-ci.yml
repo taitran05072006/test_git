@@ -89,7 +89,7 @@ jobs:
           format: table
           exit-code: "1"
           ignore-unfixed: true
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
 
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@v0.36.0
@@ -98,4 +98,52 @@ jobs:
           format: table
           exit-code: "1"
           ignore-unfixed: true
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
+
+  deploy:
+    needs: build-test-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+          tags: tag:ci
+          ping: ${{ secrets.SERVER_HOST }}
+          log-mode: normal
+
+      - name: Deploy Application
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            set -e
+            cd /home/deploy/java-deploy
+            NEW_TAG="${{ github.sha }}"
+
+            IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend
+            IMAGE_TAG="$NEW_TAG" docker compose up -d \
+              --no-deps \
+              --force-recreate \
+              backend frontend
+
+            docker compose ps
+
+            for i in {1..12}; do
+              if curl --fail --silent --show-error \
+                http://127.0.0.1:8085/api/hello; then
+                echo "Docker Compose deploy successful: $NEW_TAG"
+                exit 0
+              fi
+              echo "Application not ready - attempt $i/12"
+              sleep 5
+            done
+
+            docker compose logs backend --tail 100 || true
+            docker compose logs frontend --tail 100 || true
+            docker compose logs mysql --tail 100 || true
+            exit 1

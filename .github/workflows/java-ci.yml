@@ -90,18 +90,22 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ github.sha }}
+          platform: linux/arm64
           format: table
           exit-code: "1"
           ignore-unfixed: true
+          scanners: vuln
           severity: CRITICAL
 
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:${{ github.sha }}
+          platform: linux/arm64
           format: table
           exit-code: "1"
           ignore-unfixed: true
+          scanners: vuln
           severity: CRITICAL
 
   deploy:

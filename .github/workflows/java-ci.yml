@@ -78,6 +78,24 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
 
+      - name: Scan backend image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
+      - name: Scan frontend image
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
+
   deploy:
     needs: build-test-push
     runs-on: ubuntu-latest
@@ -119,10 +137,6 @@ jobs:
               --no-deps \
               --force-recreate \
               backend frontend
-
-            # Recreate nginx
-            IMAGE_TAG="$NEW_TAG" docker compose up -d \
-              --force-recreate nginx
 
             echo "================================"
             echo "Container status"
@@ -169,10 +183,6 @@ jobs:
             echo ""
             echo "----- FRONTEND LOG -----"
             docker compose logs frontend --tail 100 || true
-
-            echo ""
-            echo "----- NGINX LOG -----"
-            docker compose logs nginx --tail 100 || true
 
             echo ""
             echo "----- MYSQL LOG -----"

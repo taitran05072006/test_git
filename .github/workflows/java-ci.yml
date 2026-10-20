@@ -63,24 +63,28 @@ jobs:
         with:
           context: ./product-api
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ github.sha }}
+          cache-from: type=gha,scope=product-api
+          cache-to: type=gha,mode=max,scope=product-api
 
       - name: Build and Push Frontend
         uses: docker/build-push-action@v7
         with:
           context: ./front
           push: true
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/arm64
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
             ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:${{ github.sha }}
+          cache-from: type=gha,scope=product-frontend
+          cache-to: type=gha,mode=max,scope=product-frontend
 
       - name: Scan backend image
         uses: aquasecurity/trivy-action@v0.36.0
@@ -116,24 +120,24 @@ jobs:
 
       - name: Deploy Application
         uses: appleboy/ssh-action@v1
+        env:
+          NEW_TAG: ${{ github.sha }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: NEW_TAG
           script: |
             set -e
             cd /home/deploy/java-deploy
-            NEW_TAG="${{ github.sha }}"
 
             IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend
-            IMAGE_TAG="$NEW_TAG" docker compose up -d \
-              --no-deps \
-              --force-recreate \
-              backend frontend
+            IMAGE_TAG="$NEW_TAG" docker compose up -d --no-deps --force-recreate backend frontend
 
             docker compose ps
 
-            for i in {1..12}; do
+            i=1
+            while [ "$i" -le 12 ]; do
               if curl --fail --silent --show-error \
                 http://127.0.0.1:8085/api/hello; then
                 echo "Docker Compose deploy successful: $NEW_TAG"
@@ -141,6 +145,7 @@ jobs:
               fi
               echo "Application not ready - attempt $i/12"
               sleep 5
+              i=$((i + 1))
             done
 
             docker compose logs backend --tail 100 || true

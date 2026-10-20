@@ -67,6 +67,8 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ github.sha }}
 
       - name: Build and Push Frontend
         uses: docker/build-push-action@v7
@@ -77,11 +79,13 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:latest
             ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
+            ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:${{ github.sha }}
 
       - name: Scan backend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/java-backend:${{ github.sha }}
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/product-api:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
@@ -90,102 +94,8 @@ jobs:
       - name: Scan frontend image
         uses: aquasecurity/trivy-action@v0.36.0
         with:
-          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/java-frontend:${{ github.sha }}
+          image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/product-frontend:${{ github.sha }}
           format: table
           exit-code: "1"
           ignore-unfixed: true
           severity: CRITICAL,HIGH
-
-  deploy:
-    needs: build-test-push
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Connect Tailscale
-        uses: tailscale/github-action@v4
-        with:
-          oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
-          oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
-          tags: tag:ci
-          ping: ${{ secrets.SERVER_HOST }}
-          log-mode: normal
-
-
-      - name: Deploy Application
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-
-          script: |
-            set -e
-
-            cd /home/deploy/java-deploy
-
-            NEW_TAG="${{ github.sha }}"
-
-            echo "================================"
-            echo "Deploy version: $NEW_TAG"
-            echo "================================"
-
-            # Pull đúng backend + frontend của commit hiện tại
-            IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend
-
-            # Deploy backend + frontend mới
-            IMAGE_TAG="$NEW_TAG" docker compose up -d \
-              --no-deps \
-              --force-recreate \
-              backend frontend
-
-            echo "================================"
-            echo "Container status"
-            echo "================================"
-
-            docker compose ps
-
-            echo "================================"
-            echo "Waiting for application"
-            echo "================================"
-
-            for i in {1..12}; do
-
-              if curl \
-                --fail \
-                --silent \
-                --show-error \
-                http://127.0.0.1:8085/api/hello; then
-
-                echo ""
-                echo "================================"
-                echo "Deploy successful"
-                echo "Version: $NEW_TAG"
-                echo "================================"
-
-                docker compose ps
-
-                exit 0
-              fi
-
-              echo "Application not ready - attempt $i/12"
-
-              sleep 5
-            done
-
-            echo "================================"
-            echo "Deploy failed"
-            echo "================================"
-
-            echo ""
-            echo "----- BACKEND LOG -----"
-            docker compose logs backend --tail 100 || true
-
-            echo ""
-            echo "----- FRONTEND LOG -----"
-            docker compose logs frontend --tail 100 || true
-
-            echo ""
-            echo "----- MYSQL LOG -----"
-            docker compose logs mysql --tail 100 || true
-
-            exit 1

@@ -1,12 +1,16 @@
 name: Kubernetes deploy
 
 on:
+  workflow_run:
+    workflows: ["Java CI Docker"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
         description: Helm values file to use
         required: true
-        default: staging
+        default: dev
         type: choice
         options: [dev, staging, production]
       image_tag:
@@ -19,10 +23,15 @@ permissions:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment }}
+    environment: ${{ inputs.environment || 'dev' }}
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
       - uses: azure/setup-helm@v4
       - name: Configure kubeconfig
         env:
@@ -34,15 +43,15 @@ jobs:
           chmod 600 "$HOME/.kube/config"
       - name: Deploy with Helm
         env:
-          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
           IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
         run: |
           test -n "$IMAGE_REGISTRY"
           helm upgrade --install product-api deploy/helm/product-api \
             --namespace product --create-namespace \
-            --values "deploy/helm/product-api/values-${{ inputs.environment }}.yaml" \
+            --values "deploy/helm/product-api/values-${{ inputs.environment || 'dev' }}.yaml" \
             --set images.backend.repository="$IMAGE_REGISTRY/product-api" \
             --set images.backend.tag="$IMAGE_TAG" \
             --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \
             --set images.frontend.tag="$IMAGE_TAG" \
-            --atomic --wait --timeout 10m
+            --rollback-on-failure --wait --timeout 10m

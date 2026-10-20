@@ -133,8 +133,8 @@ jobs:
             set -e
             cd /home/deploy/java-deploy
 
-            IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend
-            IMAGE_TAG="$NEW_TAG" docker compose up -d --no-deps --force-recreate backend frontend
+            IMAGE_TAG="$NEW_TAG" docker compose pull backend frontend nginx
+            IMAGE_TAG="$NEW_TAG" docker compose up -d --no-deps --force-recreate backend frontend nginx
 
             docker compose ps
 
@@ -152,5 +152,6 @@ jobs:
 
             docker compose logs backend --tail 100 || true
             docker compose logs frontend --tail 100 || true
+            docker compose logs nginx --tail 100 || true
             docker compose logs mysql --tail 100 || true
             exit 1

@@ -12,7 +12,7 @@ RUN mvn -B -ntp package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
-RUN apk add --no-cache wget
+RUN apk upgrade --no-cache && apk add --no-cache wget
 RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
 
 COPY --from=build /app/target/*.jar app.jar

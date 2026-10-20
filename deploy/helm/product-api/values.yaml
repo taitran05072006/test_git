@@ -1,0 +1,49 @@
+namespace: product
+images:
+  backend:
+    repository: your-registry/product-api
+    tag: dev
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: your-registry/product-frontend
+    tag: dev
+    pullPolicy: IfNotPresent
+imagePullSecrets: []
+replicas:
+  backend: 2
+  frontend: 2
+database:
+  inCluster: false
+  host: mysql.example.internal
+  port: 3306
+  name: productdb
+  user: product
+  createSecret: false
+  password: ""
+  rootPassword: ""
+  ddlAuto: validate
+  existingSecret: product-api-database
+  passwordKey: password
+ingress:
+  enabled: false
+  className: nginx
+  host: product.example.com
+  tls:
+    enabled: false
+    secretName: product-api-tls
+resources:
+  backend:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: 500m, memory: 512Mi}
+  frontend:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 200m, memory: 128Mi}
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+mysql:
+  image: mysql:8.0
+  storage:
+    size: 1Gi

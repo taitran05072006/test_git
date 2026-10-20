@@ -1,0 +1,62 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: product-api-backend, namespace: {{ .Values.namespace }}}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app: product-api-backend}}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: product-api-default-deny, namespace: {{ .Values.namespace }}}
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: product-api-allow, namespace: {{ .Values.namespace }}}
+spec:
+  podSelector: {matchLabels: {app: product-api-backend}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: product-api-frontend}}}]
+      ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to: [{ipBlock: {cidr: 0.0.0.0/0}}]
+      ports: [{protocol: TCP, port: {{ .Values.database.port }}}, {protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: product-api-frontend-allow, namespace: {{ .Values.namespace }}}
+spec:
+  podSelector: {matchLabels: {app: product-api-frontend}}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports: [{protocol: TCP, port: 8080}]
+  egress:
+    - to: [{podSelector: {matchLabels: {app: product-api-backend}}}]
+      ports: [{protocol: TCP, port: 8080}]
+    - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: product-api-mysql-allow, namespace: {{ .Values.namespace }}}
+spec:
+  podSelector: {matchLabels: {app: mysql}}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {matchLabels: {app: product-api-backend}}}]
+      ports: [{protocol: TCP, port: 3306}]
+{{- if .Values.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: {name: product-api-backend, namespace: {{ .Values.namespace }}}
+spec:
+  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: product-api-backend}
+  minReplicas: {{ .Values.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource: {name: cpu, target: {type: Utilization, averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}}}
+{{- end }}

@@ -1,0 +1,19 @@
+images:
+  backend: {repository: product-api, tag: dev}
+  frontend: {repository: product-frontend, tag: dev}
+replicas: {backend: 1, frontend: 1}
+database:
+  inCluster: true
+  host: mysql
+  port: 3306
+  name: demo
+  user: product
+  createSecret: true
+  password: product123
+  rootPassword: root123
+  ddlAuto: update
+mysql:
+  storage:
+    size: 1Gi
+ingress:
+  enabled: false

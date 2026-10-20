@@ -1,0 +1,48 @@
+name: Kubernetes deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Helm values file to use
+        required: true
+        default: staging
+        type: choice
+        options: [dev, staging, production]
+      image_tag:
+        description: Immutable image tag (usually a commit SHA)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: azure/setup-helm@v4
+      - name: Configure kubeconfig
+        env:
+          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
+        run: |
+          test -n "$KUBECONFIG_B64"
+          mkdir -p "$HOME/.kube"
+          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$HOME/.kube/config"
+          chmod 600 "$HOME/.kube/config"
+      - name: Deploy with Helm
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
+        run: |
+          test -n "$IMAGE_REGISTRY"
+          helm upgrade --install product-api deploy/helm/product-api \
+            --namespace product --create-namespace \
+            --values "deploy/helm/product-api/values-${{ inputs.environment }}.yaml" \
+            --set images.backend.repository="$IMAGE_REGISTRY/product-api" \
+            --set images.backend.tag="$IMAGE_TAG" \
+            --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \
+            --set images.frontend.tag="$IMAGE_TAG" \
+            --atomic --wait --timeout 10m

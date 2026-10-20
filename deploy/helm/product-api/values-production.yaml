@@ -1,0 +1,6 @@
+ingress:
+  enabled: true
+  host: product.example.com
+  tls: {enabled: true, secretName: product-production-tls}
+autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 10, targetCPUUtilizationPercentage: 65}
+replicas: {backend: 3, frontend: 3}

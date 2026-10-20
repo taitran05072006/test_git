@@ -9,16 +9,18 @@ RUN mvn dependency:go-offline -B
 
 COPY src ./src
 
-RUN mvn clean package -DskipTests -B
+RUN mvn -B package -DskipTests
 
-# Giai đoạn 2: Chạy Java
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
+RUN apk add --no-cache wget
+RUN addgroup -S -g 10001 app && adduser -S -u 10001 -G app app
 
 COPY --from=build /app/target/*.jar app.jar
+RUN chown app:app app.jar
 
 EXPOSE 8080
 
+USER 10001:10001
 ENTRYPOINT ["java", "-jar", "app.jar"]
-

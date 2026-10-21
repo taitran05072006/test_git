@@ -48,27 +48,38 @@ jobs:
           IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
           IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
           REPOSITORY: ${{ github.repository }}
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          envs: DEPLOY_ENV,IMAGE_REGISTRY,IMAGE_TAG,REPOSITORY
+          envs: DEPLOY_ENV,IMAGE_REGISTRY,IMAGE_TAG,REPOSITORY,GITHUB_TOKEN
           script: |
             set -e
-            test -n "$IMAGE_REGISTRY"
-            test -n "$IMAGE_TAG"
-            test -n "$REPOSITORY"
-            command -v helm >/dev/null
-            command -v git >/dev/null
+            [ -n "$IMAGE_REGISTRY" ] || { echo "IMAGE_REGISTRY is empty"; exit 1; }
+            [ -n "$IMAGE_TAG" ] || { echo "IMAGE_TAG is empty"; exit 1; }
+            [ -n "$REPOSITORY" ] || { echo "REPOSITORY is empty"; exit 1; }
+            [ -n "$GITHUB_TOKEN" ] || { echo "GITHUB_TOKEN is empty"; exit 1; }
+            command -v helm || { echo "helm is not installed or not in PATH for $(id -un)"; exit 1; }
+            command -v kubectl || { echo "kubectl is not installed or not in PATH"; exit 1; }
+            command -v curl || { echo "curl is not installed or not in PATH"; exit 1; }
+            command -v tar || { echo "tar is not installed or not in PATH"; exit 1; }
+            export KUBECONFIG="${KUBECONFIG:-$HOME/.kube/config}"
+            [ -r "$KUBECONFIG" ] || { echo "Kubeconfig is not readable: $KUBECONFIG"; exit 1; }
+            kubectl get nodes
 
             WORKDIR="$(mktemp -d)"
             trap 'rm -rf "$WORKDIR"' EXIT
-            git clone --quiet "https://github.com/$REPOSITORY.git" "$WORKDIR/repository"
-            git -C "$WORKDIR/repository" fetch --quiet --depth 1 origin "$IMAGE_TAG"
-            git -C "$WORKDIR/repository" checkout --quiet "$IMAGE_TAG"
+            curl --fail --silent --show-error --location \
+              --header "Authorization: Bearer $GITHUB_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              "https://api.github.com/repos/$REPOSITORY/tarball/$IMAGE_TAG" \
+              --output "$WORKDIR/source.tar.gz"
+            mkdir "$WORKDIR/source"
+            tar -xzf "$WORKDIR/source.tar.gz" --strip-components=1 -C "$WORKDIR/source"
 
             helm upgrade --install product-api \
-              "$WORKDIR/repository/deploy/helm/product-api" \
+              "$WORKDIR/source/deploy/helm/product-api" \
               --namespace product \
               --create-namespace \
               --values "$WORKDIR/repository/deploy/helm/product-api/values-$DEPLOY_ENV.yaml" \

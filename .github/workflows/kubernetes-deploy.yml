@@ -82,7 +82,7 @@ jobs:
               "$WORKDIR/source/deploy/helm/product-api" \
               --namespace product \
               --create-namespace \
-              --values "$WORKDIR/repository/deploy/helm/product-api/values-$DEPLOY_ENV.yaml" \
+              --values "$WORKDIR/source/deploy/helm/product-api/values-$DEPLOY_ENV.yaml" \
               --set images.backend.repository="$IMAGE_REGISTRY/product-api" \
               --set images.backend.tag="$IMAGE_TAG" \
               --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \

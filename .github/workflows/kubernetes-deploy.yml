@@ -87,6 +87,6 @@ jobs:
               --set images.backend.tag="$IMAGE_TAG" \
               --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \
               --set images.frontend.tag="$IMAGE_TAG" \
-              --rollback-on-failure \
+              --atomic \
               --wait \
               --timeout 10m

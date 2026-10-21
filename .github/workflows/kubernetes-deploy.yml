@@ -41,44 +41,41 @@ jobs:
           tags: tag:ci
           ping: ${{ secrets.SERVER_HOST }}
           log-mode: normal
-      - name: Configure kubeconfig
+      - name: Deploy with Helm on server
+        uses: appleboy/ssh-action@v1
         env:
-          KUBECONFIG_B64: ${{ secrets.KUBECONFIG_B64 }}
-          KUBE_API_SERVER: ${{ secrets.KUBE_API_SERVER }}
-        run: |
-          if [ -z "$KUBECONFIG_B64" ]; then
-            echo "::error::KUBECONFIG_B64 is missing. Add it to the '${{ inputs.environment || 'dev' }}' environment or repository secrets."
-            exit 1
-          fi
-          if [ -z "$KUBE_API_SERVER" ]; then
-            echo "::error::KUBE_API_SERVER is missing. Set it to the reachable Kubernetes API URL, for example https://100.x.x.x:6443."
-            exit 1
-          fi
-          mkdir -p "$HOME/.kube"
-          printf '%s' "$KUBECONFIG_B64" | base64 --decode > "$HOME/.kube/config"
-          awk -v server="$KUBE_API_SERVER" \
-            '/^[[:space:]]*server:/ {$0 = "    server: " server} {print}' \
-            "$HOME/.kube/config" > "$HOME/.kube/config.tmp"
-          mv "$HOME/.kube/config.tmp" "$HOME/.kube/config"
-          chmod 600 "$HOME/.kube/config"
-          if grep -q '0\.0\.0\.0\|127\.0\.0\.1\|localhost' "$HOME/.kube/config"; then
-            echo "::error::Kubeconfig still contains a loopback Kubernetes API endpoint."
-            exit 1
-          fi
-      - name: Deploy with Helm
-        env:
-          IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
+          DEPLOY_ENV: ${{ inputs.environment || 'dev' }}
           IMAGE_REGISTRY: ${{ vars.IMAGE_REGISTRY }}
-        run: |
-          if [ -z "$IMAGE_REGISTRY" ]; then
-            echo "::error::IMAGE_REGISTRY is missing. Add it as a variable to the '${{ inputs.environment || 'dev' }}' environment or repository variables."
-            exit 1
-          fi
-          helm upgrade --install product-api deploy/helm/product-api \
-            --namespace product --create-namespace \
-            --values "deploy/helm/product-api/values-${{ inputs.environment || 'dev' }}.yaml" \
-            --set images.backend.repository="$IMAGE_REGISTRY/product-api" \
-            --set images.backend.tag="$IMAGE_TAG" \
-            --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \
-            --set images.frontend.tag="$IMAGE_TAG" \
-            --rollback-on-failure --wait --timeout 10m
+          IMAGE_TAG: ${{ inputs.image_tag || github.event.workflow_run.head_sha || github.sha }}
+          REPOSITORY: ${{ github.repository }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          envs: DEPLOY_ENV,IMAGE_REGISTRY,IMAGE_TAG,REPOSITORY
+          script: |
+            set -e
+            test -n "$IMAGE_REGISTRY"
+            test -n "$IMAGE_TAG"
+            test -n "$REPOSITORY"
+            command -v helm >/dev/null
+            command -v git >/dev/null
+
+            WORKDIR="$(mktemp -d)"
+            trap 'rm -rf "$WORKDIR"' EXIT
+            git clone --quiet "https://github.com/$REPOSITORY.git" "$WORKDIR/repository"
+            git -C "$WORKDIR/repository" fetch --quiet --depth 1 origin "$IMAGE_TAG"
+            git -C "$WORKDIR/repository" checkout --quiet "$IMAGE_TAG"
+
+            helm upgrade --install product-api \
+              "$WORKDIR/repository/deploy/helm/product-api" \
+              --namespace product \
+              --create-namespace \
+              --values "$WORKDIR/repository/deploy/helm/product-api/values-$DEPLOY_ENV.yaml" \
+              --set images.backend.repository="$IMAGE_REGISTRY/product-api" \
+              --set images.backend.tag="$IMAGE_TAG" \
+              --set images.frontend.repository="$IMAGE_REGISTRY/product-frontend" \
+              --set images.frontend.tag="$IMAGE_TAG" \
+              --rollback-on-failure \
+              --wait \
+              --timeout 10m

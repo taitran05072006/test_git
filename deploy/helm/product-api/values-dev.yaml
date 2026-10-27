@@ -1,6 +1,6 @@
 images:
-  backend: {repository: taitran05072006/product-api, tag: 9f55ade2efa37559434c439514841532f1fc7dd8, pullPolicy: IfNotPresent}
-  frontend: {repository: taitran05072006/product-frontend, tag: 9f55ade2efa37559434c439514841532f1fc7dd8, pullPolicy: IfNotPresent}
+  backend: {repository: taitran05072006/product-api, tag: 679f68fb503496e0836880a11bfeed20344c6311, pullPolicy: IfNotPresent}
+  frontend: {repository: taitran05072006/product-frontend, tag: 679f68fb503496e0836880a11bfeed20344c6311, pullPolicy: IfNotPresent}
 replicas: {backend: 2, frontend: 2}
 database:
   inCluster: true

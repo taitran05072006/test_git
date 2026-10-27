@@ -7,7 +7,11 @@ export default defineConfig({
   server: {
     proxy: {
       "/api": {
-        target: "http://192.168.64.2:8085",
+        target: process.env.VITE_BACKEND_URL || "http://localhost:8080",
+        changeOrigin: true,
+      },
+      "/users": {
+        target: process.env.VITE_BACKEND_URL || "http://localhost:8080",
         changeOrigin: true,
       },
     },

@@ -1,12 +1,12 @@
 namespace: product
 images:
   backend:
-    repository: your-registry/product-api
-    tag: dev
+    repository: taitran05072006/product-api
+    tag: ""
     pullPolicy: IfNotPresent
   frontend:
-    repository: your-registry/product-frontend
-    tag: dev
+    repository: taitran05072006/product-frontend
+    tag: ""
     pullPolicy: IfNotPresent
 imagePullSecrets: []
 replicas:
@@ -14,20 +14,18 @@ replicas:
   frontend: 2
 database:
   inCluster: false
-  host: mysql.example.internal
+  host: ""
   port: 3306
   name: productdb
   user: product
-  createSecret: false
-  password: ""
-  rootPassword: ""
   ddlAuto: validate
   existingSecret: product-api-database
   passwordKey: password
 ingress:
   enabled: false
-  className: nginx
-  host: product.example.com
+  className: ""
+  host: ""
+  annotations: {}
   tls:
     enabled: false
     secretName: product-api-tls
@@ -38,12 +36,36 @@ resources:
   frontend:
     requests: {cpu: 25m, memory: 32Mi}
     limits: {cpu: 200m, memory: 128Mi}
-autoscaling:
-  enabled: false
-  minReplicas: 2
-  maxReplicas: 6
-  targetCPUUtilizationPercentage: 70
+backend:
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: null
+frontend:
+  hpa:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
+    maxUnavailable: null
 mysql:
   image: mysql:8.0
   storage:
     size: 1Gi
+networkPolicy:
+  enabled: true
+  dnsNamespace: ""
+  dnsPodSelector: {}
+  ingressControllerNamespace: ""
+  ingressControllerPodSelector: {}
+  externalDatabaseCIDR: ""

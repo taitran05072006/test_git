@@ -1,19 +1,33 @@
 images:
-  backend: {repository: product-api, tag: dev}
-  frontend: {repository: product-frontend, tag: dev}
-replicas: {backend: 1, frontend: 1}
+  backend: {repository: taitran05072006/product-api, tag: dev, pullPolicy: IfNotPresent}
+  frontend: {repository: taitran05072006/product-frontend, tag: dev, pullPolicy: IfNotPresent}
+replicas: {backend: 2, frontend: 2}
 database:
   inCluster: true
   host: mysql
   port: 3306
   name: demo
   user: product
-  createSecret: true
-  password: product123
-  rootPassword: root123
+  existingSecret: product-api-database
   ddlAuto: update
 mysql:
   storage:
     size: 1Gi
 ingress:
-  enabled: false
+  enabled: true
+  className: traefik
+  host: product.local
+  hosts:
+    - product.local
+    - localhost
+networkPolicy:
+  dnsNamespace: kube-system
+  dnsPodSelector:
+    k8s-app: kube-dns
+  ingressControllerNamespace: kube-system
+  ingressControllerPodSelector:
+    app.kubernetes.io/name: traefik
+backend:
+  pdb: {enabled: false}
+frontend:
+  pdb: {enabled: false}

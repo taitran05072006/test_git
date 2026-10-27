@@ -1,21 +1,65 @@
 {{- if .Values.ingress.enabled }}
+{{- $hosts := .Values.ingress.hosts | default (list .Values.ingress.host) }}
+{{- if or (not $hosts) (not (index $hosts 0)) }}
+{{- fail "ingress.host or ingress.hosts must be set when ingress.enabled=true" }}
+{{- end }}
+{{- $className := required "ingress.className is required when ingress.enabled=true" .Values.ingress.className }}
+{{- if and .Values.ingress.tls.enabled (not .Values.ingress.tls.secretName) }}
+{{- fail "ingress.tls.secretName is required when ingress.tls.enabled=true" }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: product-api
   namespace: {{ .Values.namespace }}
+  labels:
+    {{- include "product-api.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
+  ingressClassName: {{ $className | quote }}
+  {{- if .Values.ingress.tls.enabled }}
   tls:
-    - hosts: [{{ .Values.ingress.host | quote }}]
-      secretName: {{ .Values.ingress.tls.secretName }}
+    - hosts:
+        {{- range $hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .Values.ingress.tls.secretName | quote }}
+  {{- end }}
   rules:
-    - host: {{ .Values.ingress.host }}
+    {{- range $hosts }}
+    - host: {{ . | quote }}
       http:
         paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8080
+          - path: /users
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8080
+          - path: /oauth
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8080
           - path: /
             pathType: Prefix
-            backend: {service: {name: frontend, port: {name: http}}}
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80
+    {{- end }}
 {{- end }}

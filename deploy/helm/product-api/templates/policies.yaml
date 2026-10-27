@@ -1,62 +1,116 @@
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata: {name: product-api-backend, namespace: {{ .Values.namespace }}}
-spec:
-  minAvailable: 1
-  selector: {matchLabels: {app: product-api-backend}}
----
+{{- if .Values.networkPolicy.enabled }}
+{{- $_ := required "networkPolicy.dnsNamespace must identify the DNS namespace" .Values.networkPolicy.dnsNamespace }}
+{{- if empty .Values.networkPolicy.dnsPodSelector }}
+{{- fail "networkPolicy.dnsPodSelector must match the cluster DNS pods" }}
+{{- end }}
+{{- if and .Values.ingress.enabled (or (not .Values.networkPolicy.ingressControllerNamespace) (empty .Values.networkPolicy.ingressControllerPodSelector)) }}
+{{- fail "networkPolicy ingress controller namespace and pod selector are required when ingress is enabled" }}
+{{- end }}
+{{- if and (not .Values.database.inCluster) (not .Values.networkPolicy.externalDatabaseCIDR) }}
+{{- fail "networkPolicy.externalDatabaseCIDR is required when NetworkPolicy is enabled for an external database" }}
+{{- end }}
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: {name: product-api-default-deny, namespace: {{ .Values.namespace }}}
+metadata:
+  name: product-api-default-deny
+  namespace: {{ .Values.namespace }}
 spec:
   podSelector: {}
   policyTypes: [Ingress, Egress]
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: {name: product-api-allow, namespace: {{ .Values.namespace }}}
+metadata:
+  name: product-api-backend-allow
+  namespace: {{ .Values.namespace }}
 spec:
-  podSelector: {matchLabels: {app: product-api-backend}}
+  podSelector:
+    matchLabels: {app: product-api-backend}
   policyTypes: [Ingress, Egress]
   ingress:
-    - from: [{podSelector: {matchLabels: {app: product-api-frontend}}}]
+    - from:
+        - podSelector:
+            matchLabels: {app: product-api-frontend}
       ports: [{protocol: TCP, port: 8080}]
+    {{- if .Values.ingress.enabled }}
+    {{- if and .Values.networkPolicy.ingressControllerNamespace .Values.networkPolicy.ingressControllerPodSelector }}
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressControllerNamespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .Values.networkPolicy.ingressControllerPodSelector | nindent 14 }}
+      ports: [{protocol: TCP, port: 8080}]
+    {{- end }}
+    {{- end }}
   egress:
-    - to: [{ipBlock: {cidr: 0.0.0.0/0}}]
-      ports: [{protocol: TCP, port: {{ .Values.database.port }}}, {protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.dnsNamespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .Values.networkPolicy.dnsPodSelector | nindent 14 }}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+    {{- if .Values.database.inCluster }}
+    - to:
+        - podSelector:
+            matchLabels: {app: mysql}
+      ports: [{protocol: TCP, port: {{ .Values.database.port }}}]
+    {{- else if .Values.networkPolicy.externalDatabaseCIDR }}
+    - to:
+        - ipBlock:
+            cidr: {{ .Values.networkPolicy.externalDatabaseCIDR | quote }}
+      ports: [{protocol: TCP, port: {{ .Values.database.port }}}]
+    {{- end }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: {name: product-api-frontend-allow, namespace: {{ .Values.namespace }}}
+metadata:
+  name: product-api-frontend-allow
+  namespace: {{ .Values.namespace }}
 spec:
-  podSelector: {matchLabels: {app: product-api-frontend}}
+  podSelector:
+    matchLabels: {app: product-api-frontend}
   policyTypes: [Ingress, Egress]
+  {{- if and .Values.ingress.enabled .Values.networkPolicy.ingressControllerNamespace .Values.networkPolicy.ingressControllerPodSelector }}
   ingress:
-    - ports: [{protocol: TCP, port: 8080}]
-  egress:
-    - to: [{podSelector: {matchLabels: {app: product-api-backend}}}]
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.ingressControllerNamespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .Values.networkPolicy.ingressControllerPodSelector | nindent 14 }}
       ports: [{protocol: TCP, port: 8080}]
-    - ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+  {{- else }}
+  ingress: []
+  {{- end }}
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app: product-api-backend}
+      ports: [{protocol: TCP, port: 8080}]
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.dnsNamespace | quote }}
+          podSelector:
+            matchLabels: {{- toYaml .Values.networkPolicy.dnsPodSelector | nindent 14 }}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+{{- if .Values.database.inCluster }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
-metadata: {name: product-api-mysql-allow, namespace: {{ .Values.namespace }}}
+metadata:
+  name: product-api-mysql-allow
+  namespace: {{ .Values.namespace }}
 spec:
-  podSelector: {matchLabels: {app: mysql}}
+  podSelector:
+    matchLabels: {app: mysql}
   policyTypes: [Ingress]
   ingress:
-    - from: [{podSelector: {matchLabels: {app: product-api-backend}}}]
+    - from:
+        - podSelector:
+            matchLabels: {app: product-api-backend}
       ports: [{protocol: TCP, port: 3306}]
-{{- if .Values.autoscaling.enabled }}
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata: {name: product-api-backend, namespace: {{ .Values.namespace }}}
-spec:
-  scaleTargetRef: {apiVersion: apps/v1, kind: Deployment, name: product-api-backend}
-  minReplicas: {{ .Values.autoscaling.minReplicas }}
-  maxReplicas: {{ .Values.autoscaling.maxReplicas }}
-  metrics:
-    - type: Resource
-      resource: {name: cpu, target: {type: Utilization, averageUtilization: {{ .Values.autoscaling.targetCPUUtilizationPercentage }}}}
+{{- end }}
 {{- end }}

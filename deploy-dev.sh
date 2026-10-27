@@ -10,5 +10,7 @@ helm upgrade --install product-api \
   --set images.frontend.repository=product-frontend \
   --set images.frontend.tag=dev \
   --set images.frontend.pullPolicy=IfNotPresent \
+  --server-side=true \
+  --force-conflicts \
   --wait \
   --timeout 10m

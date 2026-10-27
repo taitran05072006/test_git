@@ -1,0 +1,34 @@
+replicaCount: 2
+
+image:
+  repository: taitran/product-api
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+containerPort: 8080
+
+app:
+  environment: production
+  logLevel: INFO
+
+resources:
+  requests:
+    cpu: "250m"
+    memory: "256Mi"
+  limits:
+    cpu: "1000m"
+    memory: "512Mi"
+
+probes:
+  liveness:
+    path: /actuator/health/liveness
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: /actuator/health/readiness
+    initialDelaySeconds: 15
+    periodSeconds: 5

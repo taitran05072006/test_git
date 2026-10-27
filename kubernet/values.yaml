@@ -1,0 +1,34 @@
+replicaCount: 2
+
+image:
+  repository: nginx
+  tag: "1.28"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+containerPort: 80
+
+app:
+  environment: development
+  logLevel: INFO
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "64Mi"
+  limits:
+    cpu: "300m"
+    memory: "128Mi"
+
+probes:
+  liveness:
+    path: /
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /
+    initialDelaySeconds: 3
+    periodSeconds: 5

@@ -1,6 +1,22 @@
 ingress:
-  enabled: true
-  host: product.example.com
-  tls: {enabled: true, secretName: product-production-tls}
-autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 10, targetCPUUtilizationPercentage: 65}
-replicas: {backend: 3, frontend: 3}
+  enabled: false
+  className: ""
+  host: ""
+  tls: {enabled: false, secretName: ""}
+backend:
+  hpa: {enabled: true, minReplicas: 2, maxReplicas: 4, targetCPUUtilizationPercentage: 65, targetMemoryUtilizationPercentage: 80}
+frontend:
+  hpa: {enabled: true, minReplicas: 2, maxReplicas: 4, targetCPUUtilizationPercentage: 65, targetMemoryUtilizationPercentage: 80}
+replicas: {backend: 2, frontend: 2}
+# Set approved immutable tags before rendering or deployment.
+images:
+  backend: {tag: ""}
+  frontend: {tag: ""}
+# Supply the production database host, DNS selector, and DB CIDR; provide the Secret out of band.
+database:
+  inCluster: false
+  host: ""
+networkPolicy:
+  dnsNamespace: ""
+  dnsPodSelector: {}
+  externalDatabaseCIDR: ""

@@ -1,5 +1,4 @@
 {{- if .Values.database.inCluster }}
-{{- if not .Values.database.createSecret }}{{ fail "database.createSecret must be true when database.inCluster=true" }}{{- end }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -36,7 +35,7 @@ spec:
             - name: MYSQL_DATABASE
               value: {{ .Values.database.name | quote }}
             - name: MYSQL_USER
-              value: {{ .Values.database.user | quote }}
+              valueFrom: {secretKeyRef: {name: {{ .Values.database.existingSecret }}, key: username}}
             - name: MYSQL_PASSWORD
               valueFrom: {secretKeyRef: {name: {{ .Values.database.existingSecret }}, key: password}}
             - name: MYSQL_ROOT_PASSWORD
@@ -44,7 +43,7 @@ spec:
           volumeMounts:
             - {name: mysql-data, mountPath: /var/lib/mysql}
           readinessProbe:
-            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -u$${MYSQL_USER} -p$${MYSQL_PASSWORD} --silent"]}
+            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"]}
             initialDelaySeconds: 10
             periodSeconds: 5
       volumes:

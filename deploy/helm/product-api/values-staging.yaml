@@ -1,5 +1,20 @@
 ingress:
-  enabled: true
-  host: product-staging.example.com
-  tls: {enabled: true, secretName: product-staging-tls}
-autoscaling: {enabled: true, minReplicas: 2, maxReplicas: 4, targetCPUUtilizationPercentage: 70}
+  enabled: false
+  className: ""
+  host: ""
+  tls: {enabled: false, secretName: ""}
+# Fill these with the release SHA and the staging database/network values before rendering.
+images:
+  backend: {tag: ""}
+  frontend: {tag: ""}
+database:
+  inCluster: false
+  host: ""
+networkPolicy:
+  dnsNamespace: ""
+  dnsPodSelector: {}
+  externalDatabaseCIDR: ""
+backend:
+  hpa: {enabled: true, minReplicas: 2, maxReplicas: 4, targetCPUUtilizationPercentage: 70, targetMemoryUtilizationPercentage: 80}
+frontend:
+  hpa: {enabled: false}

@@ -1,0 +1,28 @@
+# macOS and Windows filesystem artifacts
+.DS_Store
+._*
+Thumbs.db
+Desktop.ini
+
+# Version control and editor metadata
+.git/
+.gitignore
+.hg/
+.svn/
+.idea/
+.vscode/
+
+# Logs, temporary files, and local environment files
+*.log
+*.tmp
+*.swp
+*.swo
+.env
+.env.*
+values-*.yaml
+*.bak
+
+# Local build and dependency output
+node_modules/
+target/
+dist/

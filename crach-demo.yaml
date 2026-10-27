@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: crash-demo
+  namespace: debug-lab
+spec:
+  restartPolicy: Always
+  containers:
+    - name: app
+      image: busybox:1.36
+      command:
+        - sh
+        - -c
+        - "echo 'Application starting'; exit 1"

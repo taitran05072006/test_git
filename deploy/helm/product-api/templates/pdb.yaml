@@ -1,0 +1,23 @@
+{{- $root := . -}}
+{{- range $component := list "backend" "frontend" }}
+{{- $config := index $root.Values $component }}
+{{- if $config.pdb.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "product-api.fullname" $root }}-{{ $component }}
+  namespace: {{ $root.Values.namespace }}
+  labels:
+    app: {{ include "product-api.fullname" $root }}-{{ $component }}
+spec:
+{{- if ne $config.pdb.maxUnavailable nil }}
+  maxUnavailable: {{ $config.pdb.maxUnavailable }}
+{{- else }}
+  minAvailable: {{ $config.pdb.minAvailable }}
+{{- end }}
+  selector:
+    matchLabels:
+      app: {{ include "product-api.fullname" $root }}-{{ $component }}
+{{- end }}
+{{- end }}

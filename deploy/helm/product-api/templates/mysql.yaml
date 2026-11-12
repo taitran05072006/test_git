@@ -22,14 +22,16 @@ metadata:
 spec:
   replicas: 1
   selector:
-    matchLabels: {app: mysql}
+    matchLabels:
+      app: mysql
   template:
     metadata:
-      labels: {app: mysql}
+      labels: 
+        app: mysql
     spec:
       containers:
         - name: mysql
-          image: {{ .Values.mysql.image }}
+          image: {{ .Values.mysql.image | quote }}
           ports: [{name: mysql, containerPort: 3306}]
           env:
             - name: MYSQL_DATABASE
@@ -42,10 +44,24 @@ spec:
               valueFrom: {secretKeyRef: {name: {{ .Values.database.existingSecret }}, key: root-password}}
           volumeMounts:
             - {name: mysql-data, mountPath: /var/lib/mysql}
+          resources: {{- toYaml .Values.mysql.resources | nindent 12 }}
+          startupProbe:
+            exec:
+              command: ["sh", "-ec", "mysqladmin ping -h 127.0.0.1 --silent"]
+            periodSeconds: 10
+            failureThreshold: 30
           readinessProbe:
-            exec: {command: ["sh", "-c", "mysqladmin ping -h 127.0.0.1 -u$MYSQL_USER -p$MYSQL_PASSWORD --silent"]}
-            initialDelaySeconds: 10
+            exec:
+              command: ["sh", "-ec", "mysqladmin ping -h 127.0.0.1 -u\"$MYSQL_USER\" -p\"$MYSQL_PASSWORD\" --silent"]
             periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["sh", "-ec", "mysqladmin ping -h 127.0.0.1 --silent"]
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
       volumes:
         - name: mysql-data
           persistentVolumeClaim: {claimName: mysql-data}

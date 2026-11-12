@@ -15,7 +15,7 @@ mysql:
     size: 1Gi
 ingress:
   enabled: true
-  className: traefik
+  className: nginx
   host: product.local
   hosts:
     - product.local
@@ -24,10 +24,11 @@ networkPolicy:
   dnsNamespace: kube-system
   dnsPodSelector:
     k8s-app: kube-dns
-  ingressControllerNamespace: kube-system
+  ingressControllerNamespace: nginx-ingress
   ingressControllerPodSelector:
-    app.kubernetes.io/name: traefik
+    app.kubernetes.io/name: nginx-ingress
+    app.kubernetes.io/instance: nginx-ingress
 backend:
-  pdb: {enabled: false}
+  pdb: {enabled: true, minAvailable: 1}
 frontend:
-  pdb: {enabled: false}
+  pdb: {enabled: true, minAvailable: 1}

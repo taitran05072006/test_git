@@ -1,30 +1,39 @@
 namespace: product
 images:
   backend:
-    repository: taitran05072006/product-api
-    tag: ""
+    repository: taitran05072006/backend
+    # Immutable build tag; keep in sync with values-dev.yaml until CI updates it.
+    tag: 9f55ade2efa37559434c439514841532f1fc7dd8
     pullPolicy: IfNotPresent
   frontend:
-    repository: taitran05072006/product-frontend
-    tag: ""
+    repository: taitran05072006/frontend
+    tag: 9f55ade2efa37559434c439514841532f1fc7dd8
     pullPolicy: IfNotPresent
 imagePullSecrets: []
 replicas:
   backend: 2
   frontend: 2
 database:
-  inCluster: false
-  host: ""
+  inCluster: true
+  host: mysql
   port: 3306
   name: productdb
   user: product
   ddlAuto: validate
   existingSecret: product-api-database
   passwordKey: password
+  # Keep credentials in a separately managed Kubernetes Secret by default.
+  createSecret: false
+  # Set only through a secure deployment input when createSecret is true.
+  password: ""
+  rootPassword: ""
 ingress:
-  enabled: false
-  className: ""
-  host: ""
+  enabled: true
+  className: nginx
+  host: product.local
+  hosts:
+    - product.local
+    - localhost
   annotations: {}
   tls:
     enabled: false
@@ -38,7 +47,7 @@ resources:
     limits: {cpu: 200m, memory: 128Mi}
 backend:
   hpa:
-    enabled: false
+    enabled: true
     minReplicas: 2
     maxReplicas: 6
     targetCPUUtilizationPercentage: 70
@@ -49,7 +58,7 @@ backend:
     maxUnavailable: null
 frontend:
   hpa:
-    enabled: false
+    enabled: true
     minReplicas: 2
     maxReplicas: 6
     targetCPUUtilizationPercentage: 70
@@ -62,10 +71,16 @@ mysql:
   image: mysql:8.0
   storage:
     size: 1Gi
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: 1, memory: 1Gi}
 networkPolicy:
   enabled: true
-  dnsNamespace: ""
-  dnsPodSelector: {}
-  ingressControllerNamespace: ""
-  ingressControllerPodSelector: {}
+  dnsNamespace: kube-system
+  dnsPodSelector:
+    k8s-app: kube-dns
+  ingressControllerNamespace: nginx-ingress
+  ingressControllerPodSelector:
+    app.kubernetes.io/name: nginx-ingress
+    app.kubernetes.io/instance: nginx-ingress
   externalDatabaseCIDR: ""
